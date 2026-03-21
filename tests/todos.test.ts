@@ -175,6 +175,106 @@ describe("GET /todos", () => {
   });
 });
 
+describe("POST /todos", () => {
+  it("returns 401 when no authorization header is provided", async () => {
+    const res = await fetch(`${baseUrl}/todos`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "Test todo" }),
+    });
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body).toHaveProperty("error");
+  });
+
+  it("returns 400 when title is missing", async () => {
+    const token = await registerAndGetToken();
+    const res = await fetch(`${baseUrl}/todos`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body).toHaveProperty("error");
+  });
+
+  it("returns 400 when title is empty string", async () => {
+    const token = await registerAndGetToken();
+    const res = await fetch(`${baseUrl}/todos`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ title: "" }),
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body).toHaveProperty("error");
+  });
+
+  it("creates a todo and returns 201 with the todo object", async () => {
+    const token = await registerAndGetToken();
+    const res = await fetch(`${baseUrl}/todos`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ title: "Buy groceries" }),
+    });
+    expect(res.status).toBe(201);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body).toHaveProperty("id");
+    expect(body).toHaveProperty("title", "Buy groceries");
+    expect(body).toHaveProperty("completed", false);
+  });
+
+  it("created todo appears in GET /todos", async () => {
+    const token = await registerAndGetToken();
+    await fetch(`${baseUrl}/todos`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ title: "Walk the dog" }),
+    });
+
+    const res = await fetch(`${baseUrl}/todos`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json() as Array<{ title: string }>;
+    expect(body).toHaveLength(1);
+    expect(body[0].title).toBe("Walk the dog");
+  });
+
+  it("todo belongs only to the creating user", async () => {
+    const tokenA = await registerAndGetToken("alice@example.com");
+    const tokenB = await registerAndGetToken("bob@example.com");
+
+    await fetch(`${baseUrl}/todos`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${tokenA}`,
+      },
+      body: JSON.stringify({ title: "Alice's private todo" }),
+    });
+
+    const res = await fetch(`${baseUrl}/todos`, {
+      headers: { Authorization: `Bearer ${tokenB}` },
+    });
+    const body = await res.json() as Array<unknown>;
+    expect(body).toHaveLength(0);
+  });
+});
+
 describe("PATCH /todos/:id", () => {
   async function createTodo(token: string, title: string): Promise<{ id: string; title: string }> {
     const res = await fetch(`${baseUrl}/todos`, {

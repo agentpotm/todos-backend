@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     include: ["tests/**/*.test.ts"],
     globalSetup: "./tests/globalSetup.ts",
+    fileParallelism: false,
     testTimeout: 15000,
     env: {
       DATABASE_URL:

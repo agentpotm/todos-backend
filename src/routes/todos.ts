@@ -40,6 +40,7 @@ router.post("/", async (req: Request, res: Response) => {
 
   try {
     const todo = await todosService.createTodo(userId(req), result.data.title);
+    broadcastToUser(userId(req), { type: "todo:created", payload: todo as Record<string, unknown> });
     res.status(201).json(todo);
   } catch (err: unknown) {
     res.status(500).json({ error: (err as Error).message });
