@@ -5,6 +5,7 @@ import type { JwtPayload } from "../types";
 
 interface AuthenticatedSocket extends WebSocket {
   userId?: string;
+  isAlive?: boolean;
 }
 
 type TodoEventType = "todo:created" | "todo:updated" | "todo:deleted";
@@ -16,7 +17,12 @@ interface TodoEvent {
 
 let wss: WebSocketServer | null = null;
 
-export function createWsServer(server: import("http").Server): WebSocketServer {
+const DEFAULT_PING_INTERVAL_MS = 30_000;
+
+export function createWsServer(
+  server: import("http").Server,
+  { pingIntervalMs = DEFAULT_PING_INTERVAL_MS }: { pingIntervalMs?: number } = {}
+): WebSocketServer {
   wss = new WebSocketServer({ server });
 
   wss.on("connection", (socket: AuthenticatedSocket, req: IncomingMessage) => {
@@ -36,9 +42,30 @@ export function createWsServer(server: import("http").Server): WebSocketServer {
       return;
     }
 
+    socket.isAlive = true;
+    socket.on("pong", () => {
+      socket.isAlive = true;
+    });
+
     socket.on("error", () => {
       // silently handle connection errors
     });
+  });
+
+  const heartbeat = setInterval(() => {
+    wss!.clients.forEach((client) => {
+      const socket = client as AuthenticatedSocket;
+      if (socket.isAlive === false) {
+        socket.terminate();
+        return;
+      }
+      socket.isAlive = false;
+      socket.ping();
+    });
+  }, pingIntervalMs);
+
+  wss.on("close", () => {
+    clearInterval(heartbeat);
   });
 
   return wss;
