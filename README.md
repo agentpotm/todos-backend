@@ -178,7 +178,14 @@ Change the username/password to match your PostgreSQL installation.
 
 ### 4. Run database migrations
 
-Push the schema to your development database:
+On a fresh clone there are no migration files yet, so generate them first:
+
+```bash
+npm run db:generate
+npm run db:migrate
+```
+
+If migration files already exist in `drizzle/` (e.g. you pulled them from the repo), skip `db:generate` and just run:
 
 ```bash
 npm run db:migrate
