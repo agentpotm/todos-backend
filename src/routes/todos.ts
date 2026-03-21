@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { z } from "zod";
 import * as todosService from "../services/todos";
 import { authMiddleware } from "../middleware/auth";
+import { broadcastToUser } from "../ws/server";
 import type { JwtPayload } from "../types";
 
 const router = Router();
@@ -54,6 +55,7 @@ router.patch("/:id", async (req: Request, res: Response) => {
 
   try {
     const todo = await todosService.updateTodo(userId(req), String(req.params.id), result.data);
+    broadcastToUser(userId(req), { type: "todo:updated", payload: todo });
     res.json(todo);
   } catch (err: unknown) {
     const status = (err as { status?: number }).status ?? 500;

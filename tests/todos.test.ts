@@ -174,3 +174,95 @@ describe("GET /todos", () => {
     expect(body[0].title).toBe("Bob's todo");
   });
 });
+
+describe("PATCH /todos/:id", () => {
+  async function createTodo(token: string, title: string): Promise<{ id: string; title: string }> {
+    const res = await fetch(`${baseUrl}/todos`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ title }),
+    });
+    return res.json() as Promise<{ id: string; title: string }>;
+  }
+
+  it("returns 401 when no authorization header is provided", async () => {
+    const res = await fetch(`${baseUrl}/todos/some-id`, { method: "PATCH" });
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body).toHaveProperty("error");
+  });
+
+  it("updates the title of a todo", async () => {
+    const token = await registerAndGetToken();
+    const todo = await createTodo(token, "Original title");
+
+    const res = await fetch(`${baseUrl}/todos/${todo.id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ title: "Updated title" }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as { id: string; title: string };
+    expect(body.title).toBe("Updated title");
+    expect(body.id).toBe(todo.id);
+  });
+
+  it("rejects empty text with 400", async () => {
+    const token = await registerAndGetToken();
+    const todo = await createTodo(token, "Some title");
+
+    const res = await fetch(`${baseUrl}/todos/${todo.id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ title: "" }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body).toHaveProperty("error");
+  });
+
+  it("returns 404 when todo does not belong to the authenticated user", async () => {
+    const tokenA = await registerAndGetToken("alice@example.com");
+    const tokenB = await registerAndGetToken("bob@example.com");
+    const todo = await createTodo(tokenA, "Alice's todo");
+
+    const res = await fetch(`${baseUrl}/todos/${todo.id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${tokenB}`,
+      },
+      body: JSON.stringify({ title: "Bob tries to update" }),
+    });
+
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body).toHaveProperty("error");
+  });
+
+  it("returns 404 for a non-existent todo id", async () => {
+    const token = await registerAndGetToken();
+
+    const res = await fetch(`${baseUrl}/todos/00000000-0000-0000-0000-000000000000`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ title: "Doesn't matter" }),
+    });
+
+    expect(res.status).toBe(404);
+  });
+});
