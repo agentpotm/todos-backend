@@ -264,5 +264,75 @@ describe("PATCH /todos/:id", () => {
     });
 
     expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body).toHaveProperty("error");
+  });
+});
+
+describe("DELETE /todos/:id", () => {
+  it("returns 401 when no authorization header is provided", async () => {
+    const res = await fetch(`${baseUrl}/todos/some-id`, { method: "DELETE" });
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body).toHaveProperty("error");
+  });
+
+  it("returns 204 and removes the todo", async () => {
+    const token = await registerAndGetToken();
+
+    const createRes = await fetch(`${baseUrl}/todos`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ title: "To be deleted" }),
+    });
+    const created = await createRes.json() as { id: string };
+
+    const deleteRes = await fetch(`${baseUrl}/todos/${created.id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(deleteRes.status).toBe(204);
+
+    const listRes = await fetch(`${baseUrl}/todos`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const todos = await listRes.json() as Array<unknown>;
+    expect(todos).toHaveLength(0);
+  });
+
+  it("returns 404 when todo does not exist", async () => {
+    const token = await registerAndGetToken();
+    const nonExistentId = "00000000-0000-0000-0000-000000000000";
+    const res = await fetch(`${baseUrl}/todos/${nonExistentId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body).toHaveProperty("error");
+  });
+
+  it("cannot delete a todo belonging to another user", async () => {
+    const tokenA = await registerAndGetToken("alice@example.com");
+    const tokenB = await registerAndGetToken("bob@example.com");
+
+    const createRes = await fetch(`${baseUrl}/todos`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${tokenA}`,
+      },
+      body: JSON.stringify({ title: "Alice's private todo" }),
+    });
+    const created = await createRes.json() as { id: string };
+
+    const deleteRes = await fetch(`${baseUrl}/todos/${created.id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${tokenB}` },
+    });
+    expect(deleteRes.status).toBe(404);
   });
 });

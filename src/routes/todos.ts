@@ -65,7 +65,8 @@ router.patch("/:id", async (req: Request, res: Response) => {
 
 router.delete("/:id", async (req: Request, res: Response) => {
   try {
-    await todosService.deleteTodo(userId(req), String(req.params.id));
+    const todo = await todosService.deleteTodo(userId(req), String(req.params.id));
+    broadcastToUser(userId(req), { type: "todo:deleted", payload: { id: todo.id } });
     res.status(204).send();
   } catch (err: unknown) {
     const status = (err as { status?: number }).status ?? 500;
